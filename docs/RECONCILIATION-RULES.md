@@ -1,7 +1,7 @@
 # Reconciliation Rules — implementation spec
 
 Source data verified directly: 185 order rows, 187 payment rows, 184 distinct orders.
-Full discrepancy-by-discrepancy detail is in `~/result-flow-ai-assignment/data-findings.md` (reference only, not part of this repo).
+Full discrepancy-by-discrepancy detail is kept in a local notes file outside this repo (not committed here).
 
 ## Pre-processing (before any comparison)
 
@@ -22,7 +22,7 @@ Full discrepancy-by-discrepancy detail is in `~/result-flow-ai-assignment/data-f
 | 6 | `CURRENCY_MISMATCH` | order.currency ≠ payment.currency | Medium — never compare amounts across currencies, regardless of numeric equality |
 | 7 | `PARTIAL_REFUND` | order status = `refunded`, refund amount < original charge amount | Medium |
 | 8 | `UNRECORDED_REFUND` | a refund fully offsets a charge, but order status is still `completed` | Medium |
-| 9 | `OVERCHARGED` | payment.amount − order.net_amount > tolerance | Medium |
+| 9 | `OVERCHARGED` | payment.amount − order.net_amount > tolerance | High — active refund liability, not just a data mismatch |
 | 10 | `UNDERCHARGED` | order.net_amount − payment.amount > tolerance | Medium |
 | 11 | `PENDING_PAYMENT` | matching payment `status = pending` | Low — in transit, not lost, keep separate from failed |
 | 12 | `DELAYED_SETTLEMENT` | payment processed_at − order_date > 72 hours (money did arrive) | Low |
