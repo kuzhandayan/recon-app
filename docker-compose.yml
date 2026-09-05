@@ -1,0 +1,16 @@
+# Local dev only. Prod compose file is a separate, later addition.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - WATCHPACK_POLLING=true
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next

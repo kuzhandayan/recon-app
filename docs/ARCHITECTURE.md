@@ -82,3 +82,17 @@ The brief: *"Do not mention any company. Our company name and product must not a
 - The **GitHub repo name must not reference the company**, even split or disguised (e.g. `result-flow`, `resultflow`, `rf-recon`). Use something generic and descriptive: `orders-payments-reconciler`, `recon-dashboard`, `revenue-recon`.
 - No cloud resource (bucket, DB instance name, project name) should contain it either — anything that shows up in a URL or a dashboard screenshot during the review call counts as "the application itself." (The bucket is already named `recon-uploads-kv` — safe.)
 - This local folder name (`result_flow_assignment`) never gets pushed — it's just your working directory. Only the GitHub repo name and any live URLs matter.
+
+## Docker (local development)
+
+- **Base image: `node:22-alpine`.** Smallest, fastest to build and rebuild — matters since every new dependency triggers a rebuild (see below). Alpine uses `musl` libc instead of `glibc`, which normally breaks Prisma's compiled query engine, but this is a known, one-line fix rather than a reason to avoid Alpine: `prisma/schema.prisma`'s `generator client` block must include
+  ```prisma
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+  ```
+  Set this the moment `schema.prisma` is created — don't wait to hit the error first.
+- **Rebuild required whenever `package.json` changes.** `RUN npm install` happens once, at image build time — it is baked into that layer. Adding a new dependency (Prisma, bcryptjs, groq-sdk, csv-parse, the B2/S3 SDK, all still to come) and just restarting the container will **not** pick it up; the container will run against the old `node_modules` baked into the image. After adding any dependency, rebuild with:
+  ```
+  docker compose up --build
+  ```
+  Editing existing `.ts`/`.tsx` source files does **not** need a rebuild — those are bind-mounted live from the host, which is what makes hot reload work. Only a `package.json` change (or a change to `Dockerfile.dev` itself) needs `--build`.
+- **Production Docker is intentionally not built yet** — `Dockerfile`, `docker-compose.prod.yml` are deferred until the app itself works locally. Only `Dockerfile.dev`, `docker-compose.yml`, and `.dockerignore` exist right now.
