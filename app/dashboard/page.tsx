@@ -4,8 +4,8 @@ import { SESSION_COOKIE, verifySession } from "@/lib/auth";
 import { getDownloadUrl, b2Configured } from "@/lib/storage";
 import { LogoutButton } from "./logout-button";
 import { UploadForm } from "@/components/UploadForm";
+import { Dashboard } from "@/components/Dashboard";
 
-// Headline tiles, chart, and drill-down table still to come, see docs/BUILD-PLAN.md
 export default async function DashboardPage() {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   const session = token ? verifySession(token) : null;
@@ -36,6 +36,7 @@ export default async function DashboardPage() {
         <LogoutButton />
       </div>
       <UploadForm initialImports={initialImports} initialNextCursor={initialNextCursor} />
+      <Dashboard />
     </main>
   );
 }

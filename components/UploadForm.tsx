@@ -166,7 +166,7 @@ export function UploadForm({ initialImports, initialNextCursor }: UploadFormProp
         <button
           type="submit"
           disabled={loading}
-          className="flex w-full items-center justify-center gap-2 rounded bg-black py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-2 rounded border bg-black py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           {loading && (
             <span
