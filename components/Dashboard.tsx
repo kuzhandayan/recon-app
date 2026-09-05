@@ -18,12 +18,18 @@ function formatCurrency(n: number): string {
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-export function Dashboard() {
+interface DashboardProps {
+  importsRefreshKey?: number;
+  onReconciled?: () => void;
+}
+
+export function Dashboard({ importsRefreshKey = 0, onReconciled }: DashboardProps) {
   const [headline, setHeadline] = useState<Headline | null>(null);
   const [byClass, setByClass] = useState<Record<string, number>>({});
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [hasUnreconciled, setHasUnreconciled] = useState(false);
 
   async function loadHeadline() {
     const res = await fetch("/api/discrepancies?page=1");
@@ -34,9 +40,22 @@ export function Dashboard() {
     }
   }
 
+  // Any completed import not yet covered by a reconcile run — see docs/RECONCILIATION-RULES.md
+  async function checkUnreconciled() {
+    const res = await fetch("/api/upload");
+    const data = await res.json().catch(() => null);
+    if (res.ok) {
+      setHasUnreconciled(data.imports.some((imp: { status: string; isReconciled: boolean }) => imp.status === "COMPLETED" && !imp.isReconciled));
+    }
+  }
+
   useEffect(() => {
     loadHeadline();
   }, []);
+
+  useEffect(() => {
+    checkUnreconciled();
+  }, [importsRefreshKey]);
 
   async function runReconciliation() {
     setRunning(true);
@@ -46,7 +65,9 @@ export function Dashboard() {
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Reconciliation failed.");
       await loadHeadline();
+      await checkUnreconciled();
       setRefreshKey((k) => k + 1);
+      onReconciled?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Reconciliation failed.");
     } finally {
@@ -57,7 +78,14 @@ export function Dashboard() {
   return (
     <div className="w-full max-w-4xl space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Reconciliation</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold">Reconciliation</h2>
+          {hasUnreconciled && (
+            <span className="rounded-full border border-yellow-500 px-2 py-0.5 text-xs font-medium text-yellow-500">
+              New data — click &quot;Run reconciliation&quot; to see it
+            </span>
+          )}
+        </div>
         <button
           type="button"
           onClick={runReconciliation}

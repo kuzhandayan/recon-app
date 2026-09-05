@@ -3,8 +3,7 @@ import { db } from "@/lib/db";
 import { SESSION_COOKIE, verifySession } from "@/lib/auth";
 import { getDownloadUrl, b2Configured } from "@/lib/storage";
 import { LogoutButton } from "./logout-button";
-import { UploadForm } from "@/components/UploadForm";
-import { Dashboard } from "@/components/Dashboard";
+import { DashboardShell } from "@/components/DashboardShell";
 
 export default async function DashboardPage() {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
@@ -36,8 +35,7 @@ export default async function DashboardPage() {
         <p className="text-sm text-gray-500">Signed in as {user?.email}</p>
         <LogoutButton />
       </div>
-      <UploadForm initialImports={initialImports} initialNextCursor={initialNextCursor} />
-      <Dashboard />
+      <DashboardShell initialImports={initialImports} initialNextCursor={initialNextCursor} />
     </main>
   );
 }

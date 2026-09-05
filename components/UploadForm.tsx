@@ -16,6 +16,8 @@ interface ImportRow {
 interface UploadFormProps {
   initialImports: ImportRow[];
   initialNextCursor: string | null;
+  onUploaded?: () => void;
+  refreshSignal?: number;
 }
 
 interface FilePickerProps {
@@ -56,7 +58,7 @@ function FilePicker({ kind, label, file, fieldError, disabled, onChange }: FileP
   );
 }
 
-export function UploadForm({ initialImports, initialNextCursor }: UploadFormProps) {
+export function UploadForm({ initialImports, initialNextCursor, onUploaded, refreshSignal }: UploadFormProps) {
   const [imports, setImports] = useState<ImportRow[]>(initialImports);
   const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -88,6 +90,11 @@ export function UploadForm({ initialImports, initialNextCursor }: UploadFormProp
       setNextCursor(data.nextCursor);
     }
   }
+
+  // Re-fetch when the parent signals a reconcile just completed, so isReconciled badges update without a page refresh
+  useEffect(() => {
+    if (refreshSignal) refreshImports();
+  }, [refreshSignal]);
 
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
@@ -130,6 +137,7 @@ export function UploadForm({ initialImports, initialNextCursor }: UploadFormProp
       setOrdersFile(null);
       setPaymentsFile(null);
       await refreshImports();
+      onUploaded?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed.");
     } finally {
