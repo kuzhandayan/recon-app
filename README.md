@@ -5,6 +5,8 @@ a fixed set of business rules, and presents the result as a dashboard someone re
 for revenue could actually act on — headline figures, a breakdown by discrepancy type, a
 filterable drill-down table, and an on-demand AI explanation for any individual row.
 
+**Live:** [recon-app-self.vercel.app](https://recon-app-self.vercel.app) — sign-up is open, no test account needed.
+
 ## Setup and running locally
 
 Requirements: Node 22+, a Postgres database (this project targets [Neon](https://neon.tech)'s
@@ -82,7 +84,9 @@ lib/
   csv.ts         — CSV parsing, column validation, file-kind detection
   reconcile.ts   — the deterministic engine, pure function, no I/O
   llm.ts         — the one Groq/Gemini call, structured output + error handling
-components/      — UploadForm, Dashboard, StatTile, DiscrepancyChart, DiscrepancyTable, ExplainPanel
+components/      — DashboardShell (syncs UploadForm + Dashboard, siblings otherwise unaware of
+                   each other), UploadForm, Dashboard, StatTile, DiscrepancyChart,
+                   DiscrepancyTable, ExplainPanel, SparkleIcon
 prisma/          — schema.prisma + migrations
 docs/            — ARCHITECTURE.md, RECONCILIATION-RULES.md, FEATURES.md, BUILD-PLAN.md
 ```
@@ -219,7 +223,9 @@ freshly-generated answer (instant on a cached one), and a clear error message wi
 path if the LLM call fails. Uploaded files show an `isReconciled` badge — new uploads default
 to "not reconciled," flip to reconciled once "Run reconciliation" completes, and reset again
 on the next upload, so it's always clear from the UI whether the discrepancy list reflects the
-data currently on file.
+data currently on file. A matching tag appears next to the "Run reconciliation" button itself
+whenever any completed import is still unreconciled, and both update live (no page refresh)
+the moment an upload or a reconcile finishes.
 
 ## What's next with more time
 

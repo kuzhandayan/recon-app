@@ -3,7 +3,7 @@
 Total budget assumed: ~6 hours of actual build time. Track against this — if a step overruns by more
 than 15 minutes, cut scope rather than push the deadline.
 
-- [x] **Rename repo before first push.** Generic name, no "result flow" in any form. Update remote origin. (`recon-app`)
+- [x] **Rename repo before first push.** Generic name, no company reference in any form. Update remote origin. (`recon-app`)
 - [x] **Scaffold** — `npx create-next-app@latest` (TypeScript, App Router, Tailwind ok). Prisma init. Neon DB created, `DATABASE_URL` in `.env`. — 45 min
 - [x] **Schema** — `User`, `Order`, `Payment`, `Discrepancy`, `Import` models in `prisma/schema.prisma`, scoped by `userId`. Run migration. — included above
 - [x] **Auth** — signup/login API routes, bcrypt hash, JWT in httpOnly cookie, `proxy.ts` (Next.js 16's renamed middleware) protects `/dashboard` and all `/api/*` except auth routes. — 45 min

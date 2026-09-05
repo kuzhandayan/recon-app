@@ -78,9 +78,9 @@ README.md                    <- written LAST, after the app works
 
 The brief: *"Do not mention any company. Our company name and product must not appear anywhere in the code, commits, README, repository name, or the application itself."*
 
-- The **GitHub repo name must not reference the company**, even split or disguised (e.g. `result-flow`, `resultflow`, `rf-recon`). Use something generic and descriptive: `orders-payments-reconciler`, `recon-dashboard`, `revenue-recon`.
+- The **GitHub repo name must not reference the company**, even split, hyphenated, or abbreviated. Use something generic and descriptive: `orders-payments-reconciler`, `recon-dashboard`, `revenue-recon`.
 - No cloud resource (bucket, DB instance name, project name) should contain it either — anything that shows up in a URL or a dashboard screenshot during the review call counts as "the application itself." (The bucket is already named `recon-uploads-kv` — safe.)
-- This local folder name (`result_flow_assignment`) never gets pushed — it's just your working directory. Only the GitHub repo name and any live URLs matter.
+- The local working-directory name never gets pushed and doesn't matter here — only the GitHub repo name and any live URLs count.
 
 ## Docker (local development)
 
