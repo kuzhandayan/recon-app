@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-// httpOnly cookie, not localStorage — see LEARNING.md for why
+// httpOnly cookie, not localStorage — inaccessible to browser JS, so an XSS payload can't read it
 export const SESSION_COOKIE = "session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
@@ -26,7 +26,7 @@ export function signSession(payload: SessionPayload): string {
 
 export function verifySession(token: string): SessionPayload | null {
   try {
-    // Pinning algorithms stops a forged token from choosing a weaker one, see LEARNING.md
+    // Pinning the algorithm stops a forged token from choosing a weaker one
     const decoded = jwt.verify(token, JWT_SECRET!, { algorithms: ["HS256"] });
     if (typeof decoded !== "object" || typeof decoded.userId !== "string" || !decoded.userId) return null;
     return { userId: decoded.userId };

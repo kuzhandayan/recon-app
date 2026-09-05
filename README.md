@@ -74,7 +74,7 @@ app/
     reconcile/route.ts              — runs lib/reconcile.ts, marks imports isReconciled
     discrepancies/route.ts          — headline stats + paginated/filtered drill-down list
     explain/route.ts                — the one LLM call per discrepancy, cached afterward
-    health/route.ts                 — liveness only, no DB query (see LEARNING.md)
+    health/route.ts                 — liveness only, no DB query
 lib/
   auth.ts        — hash/verify, JWT sign/verify
   db.ts          — Prisma client singleton (Neon adapter)
@@ -191,7 +191,7 @@ LLM explains an already-decided classification, it never influences whether two 
   available — a two-sentence explanation of an already-classified row doesn't need a large
   model's reasoning power, and a smaller model means the free-tier quota lasts far longer.
   Gemini's `-latest` alias is used instead of a pinned version number so it doesn't go stale
-  the way Groq's original model choice did mid-project (see `LEARNING.md`).
+  the way Groq's original model choice did mid-project.
 - **Structured output.** Both providers are asked for JSON mode with a fixed shape —
   `{"whatHappened": string, "recommendedAction": string}` — via `response_format` (Groq) and
   `responseMimeType` (Gemini).
@@ -237,5 +237,5 @@ against the real CSVs and iterated until every class/amount lined up with a manu
 the data), the LLM integration, and debugging a handful of environment-specific issues (Docker
 networking, Prisma migrations in a non-interactive shell, a stale Groq model that had been
 decommissioned mid-project). Every decision — the tolerances, the classification order, the
-model choices, the caching strategy — was reviewed and is understood well enough to defend;
-see `LEARNING.md` for the full reasoning behind each one.
+model choices, the caching strategy — was reviewed and is understood well enough to defend, as
+explained throughout this README.

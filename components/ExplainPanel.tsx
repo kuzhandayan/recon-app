@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { SparkleIcon } from "@/components/SparkleIcon";
 
 interface ExplainPanelProps {
   discrepancyId: string;
@@ -104,7 +105,7 @@ export function ExplainPanel({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex justify-end">
-      {/* Backdrop, click to close — portaled to <body> so it always covers the true viewport, see LEARNING.md */}
+      {/* Backdrop, click to close — portaled to <body> so it always covers the true viewport */}
       <button
         type="button"
         aria-label="Close explanation panel"
@@ -115,7 +116,9 @@ export function ExplainPanel({
       <aside className="relative flex h-full w-full max-w-sm flex-col overflow-y-auto border-l bg-white p-5 shadow-xl dark:bg-neutral-900">
         <div className="mb-1 flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-wide text-gray-400">AI explanation</p>
+            <p className="flex items-center gap-1 text-xs uppercase tracking-wide text-gray-400">
+              <SparkleIcon /> AI explanation
+            </p>
             <h3 className="text-lg font-semibold">{orderKey}</h3>
           </div>
           <button

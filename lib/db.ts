@@ -2,7 +2,7 @@ import { PrismaNeon } from "@prisma/adapter-neon";
 import { neonConfig } from "@neondatabase/serverless";
 import { PrismaClient } from "@/app/generated/prisma/client";
 
-// Neon over WebSocket/443 instead of Postgres/5432, which some networks block, see LEARNING.md
+// Neon over WebSocket/443 instead of Postgres/5432, which some networks block
 neonConfig.webSocketConstructor = WebSocket;
 
 type PrismaClientInstance = InstanceType<typeof PrismaClient>;

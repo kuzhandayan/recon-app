@@ -1,6 +1,6 @@
 "use client";
 
-// Catches transient DB errors (e.g. Neon free-tier cold-start after auto-suspend), see LEARNING.md
+// Catches transient DB errors, e.g. a Neon free-tier cold-start after auto-suspend
 export default function DashboardError({ reset }: { error: Error; reset: () => void }) {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-4 px-4 text-center">

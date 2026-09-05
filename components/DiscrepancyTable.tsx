@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ExplainPanel } from "@/components/ExplainPanel";
+import { SparkleIcon } from "@/components/SparkleIcon";
 
 interface DiscrepancyRow {
   id: string;
@@ -150,8 +151,9 @@ export function DiscrepancyTable({ refreshKey = 0 }: DiscrepancyTableProps) {
                       <button
                         type="button"
                         onClick={() => setSelected(row)}
-                        className="rounded border px-2 py-0.5 text-xs font-medium hover:bg-black/5 dark:hover:bg-white/10"
+                        className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-medium hover:bg-black/5 dark:hover:bg-white/10"
                       >
+                        <SparkleIcon />
                         {row.explanation ? "View" : "Explain"}
                       </button>
                     )}

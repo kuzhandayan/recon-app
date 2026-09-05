@@ -1,6 +1,6 @@
 import Groq from "groq-sdk";
 
-// Structured output, never called from reconcile.ts, see docs/RECONCILIATION-RULES.md and LEARNING.md
+// Structured output, never called from reconcile.ts, see docs/RECONCILIATION-RULES.md
 const MODEL = "openai/gpt-oss-20b";
 const TEMPERATURE = 0.2; // low but not 0 — factual, low-variance explanations, still natural phrasing; see README
 
@@ -71,7 +71,7 @@ async function explainWithGemini(d: DiscrepancyForExplanation): Promise<LlmExpla
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
 
-  // "-latest" alias, not a pinned version — avoids going stale, see LEARNING.md
+  // "-latest" alias, not a pinned version — avoids going stale as Google rolls out new models
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${apiKey}`,
     {
