@@ -47,6 +47,7 @@ model Import {
   userId    String
   kind      FileKind
   key       String
+  fileName  String       @default("")
   status    ImportStatus @default(PENDING)
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
@@ -61,7 +62,7 @@ model Order {
   id            String   @id @default(uuid())
   userId        String
   orderKey      String
-  orderDate     DateTime
+  orderDate     DateTime @db.Timestamptz // tz-aware: naive TIMESTAMP got misread using the server's local TZ on readback
   customerEmail String?
   currency      String
   grossAmount   Decimal  @db.Decimal(10, 2)
@@ -78,10 +79,10 @@ model Order {
 
 // Columns match payments.csv exactly; order_reference normalized the same way as Order.orderKey
 model Payment {
-  id             String   @id @default(uuid())
+  id             String    @id @default(uuid())
   userId         String
   transactionRef String
-  processedAt    DateTime
+  processedAt    DateTime? @db.Timestamptz // nullable (MISSING_FIELDS) + tz-aware, see docs/RECONCILIATION-RULES.md
   orderKey       String
   currency       String
   amount         Decimal  @db.Decimal(10, 2)
