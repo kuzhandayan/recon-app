@@ -3,11 +3,11 @@
 
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
-// musl target required for node:22-alpine dev image, see docs/ARCHITECTURE.md#docker
+// debian target matches the node:22-slim dev image, see docs/ARCHITECTURE.md#docker
 generator client {
   provider      = "prisma-client"
   output        = "../app/generated/prisma"
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {

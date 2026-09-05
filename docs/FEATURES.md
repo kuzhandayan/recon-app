@@ -20,6 +20,7 @@ was chosen, or the folder tree, see ARCHITECTURE.md — not repeated here.
 ## API routes (app/api/)
 
 - `auth/signup`, `auth/login` — issue the JWT cookie
+- `auth/logout` — clears the session cookie
 - `upload` — receives a file, sends it to B2, stores the returned key
 - `parse` — reads the file back from B2 by key, inserts rows into Postgres
 - `reconcile` — runs `lib/reconcile.ts` over that user's orders + payments

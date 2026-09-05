@@ -3,12 +3,13 @@
 ## Stack (locked)
 
 - **Next.js 16.3 + TypeScript, App Router** — one app, one language. API routes are the backend, pages are the frontend.
-- **Prisma + PostgreSQL (Neon free tier)** — real database, auto-generated types.
+- **Prisma + PostgreSQL (Neon free tier)** — real database, auto-generated types. Connects through Neon's **serverless driver over WebSocket/443** (`@prisma/adapter-neon`), not the standard Postgres port 5432, which some networks block outright. This is also the recommended driver for serverless hosts like Vercel.
 - **Auth: custom, not a third-party provider** — email + password, bcrypt hash, our own JWT in an httpOnly cookie. Every API route checks the cookie and scopes queries to `userId`.
 - **Raw file storage: Backblaze B2 (private bucket)** — the uploaded CSVs themselves are stored here, not just their parsed rows. See "File storage" below for exactly how.
 - **Parsing and reconciliation: TypeScript, not Python.** The dataset is ~200 rows total — no performance case for pandas/dataframes here. Keeping it TypeScript means one language, one service, one thing to explain in the review, rather than a second Python service talking to the Node one over the network.
 - **LLM: Groq (Llama 3.3 70B), OpenAI-compatible SDK** — free tier, JSON mode for structured output. Gemini free tier is the manual fallback if Groq rate-limits.
-- **Docker: dev (hot reload via volume mount) and production (multi-stage build)** — both requested explicitly. Because of this, deploy moves off Vercel (Vercel doesn't run custom Dockerfiles) to a Docker-friendly host — Railway or Fly.io are the candidates, decided at deploy time.
+- **Docker: local dev only** (hot reload via volume mount). **Deploy target: Vercel** — Next.js's native platform, zero container config, generous free tier. No production Dockerfile is built; the dev Docker setup stays a local convenience only.
+- **Either `npm run dev` on the host or Docker works for local dev.** The Docker path had `ETIMEDOUT` database failures until the base image moved from Alpine to Debian (see the Docker section below).
 
 ## File storage — how it actually works
 
@@ -24,7 +25,7 @@ Why keep the raw file at all, when the brief only requires the *parsed* data in 
 
 - No NextAuth / Clerk / Auth0 — one less dependency, one less thing to break on a live demo.
 - No Python service for parsing or reconciliation — see above.
-- No Vercel — Docker requirement moves deploy to a container-friendly host instead.
+- No production Dockerfile — Vercel builds Next.js natively, no container needed for deploy.
 
 ## Data flow
 
@@ -67,10 +68,8 @@ docs/
 seed/
   orders.csv
   payments.csv
-Dockerfile                   <- production, multi-stage build
-Dockerfile.dev                <- development, hot reload via volume mount
-docker-compose.yml            <- dev
-docker-compose.prod.yml       <- production
+Dockerfile.dev                <- local dev only, hot reload via volume mount
+docker-compose.yml            <- local dev only
 README.md                    <- written LAST, after the app works
 .env.example
 ```
@@ -85,14 +84,13 @@ The brief: *"Do not mention any company. Our company name and product must not a
 
 ## Docker (local development)
 
-- **Base image: `node:22-alpine`.** Smallest, fastest to build and rebuild — matters since every new dependency triggers a rebuild (see below). Alpine uses `musl` libc instead of `glibc`, which normally breaks Prisma's compiled query engine, but this is a known, one-line fix rather than a reason to avoid Alpine: `prisma/schema.prisma`'s `generator client` block must include
+- **Base image: `node:22-slim` (Debian/glibc), not Alpine.** Alpine was the original choice for size, but its `musl` libc DNS resolver is unreliable for hostnames that return multiple A *and* AAAA records — which is exactly what Neon's pooler hostname does. That caused persistent `ETIMEDOUT` failures reaching the database from inside the container. Debian's glibc resolver handles it correctly. `prisma/schema.prisma`'s `generator client` block matches the base image:
   ```prisma
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
   ```
-  Set this the moment `schema.prisma` is created — don't wait to hit the error first.
 - **Rebuild required whenever `package.json` changes.** `RUN npm install` happens once, at image build time — it is baked into that layer. Adding a new dependency (Prisma, bcryptjs, groq-sdk, csv-parse, the B2/S3 SDK, all still to come) and just restarting the container will **not** pick it up; the container will run against the old `node_modules` baked into the image. After adding any dependency, rebuild with:
   ```
   docker compose up --build
   ```
   Editing existing `.ts`/`.tsx` source files does **not** need a rebuild — those are bind-mounted live from the host, which is what makes hot reload work. Only a `package.json` change (or a change to `Dockerfile.dev` itself) needs `--build`.
-- **Production Docker is intentionally not built yet** — `Dockerfile`, `docker-compose.prod.yml` are deferred until the app itself works locally. Only `Dockerfile.dev`, `docker-compose.yml`, and `.dockerignore` exist right now.
+- **No production Dockerfile** — deploy target is Vercel (see Stack above), which builds Next.js natively. Only `Dockerfile.dev`, `docker-compose.yml`, and `.dockerignore` exist, and stay local-dev-only.

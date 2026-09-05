@@ -6,7 +6,7 @@ than 15 minutes, cut scope rather than push the deadline.
 - [ ] **Rename repo before first push.** Generic name, no "result flow" in any form. Update remote origin.
 - [ ] **Scaffold** — `npx create-next-app@latest` (TypeScript, App Router, Tailwind ok). Prisma init. Neon DB created, `DATABASE_URL` in `.env`. — 45 min
 - [ ] **Schema** — `User`, `Order`, `Payment`, `Discrepancy` models in `prisma/schema.prisma`, scoped by `userId`. Run migration. — included above
-- [ ] **Auth** — signup/login API routes, bcrypt hash, JWT in httpOnly cookie, middleware to protect `/dashboard` and all `/api/*` except auth routes. — 45 min
+- [x] **Auth** — signup/login API routes, bcrypt hash, JWT in httpOnly cookie, middleware to protect `/dashboard` and all `/api/*` except auth routes. — 45 min
 - [ ] **Upload + ingest** — file input on a page, POST to `/api/upload`, parse CSV server-side (`csv-parse` or similar), normalize keys per `RECONCILIATION-RULES.md`, insert rows tied to `userId`. — 45 min
 - [ ] **Reconciliation engine** — `lib/reconcile.ts` implementing the classification table in `RECONCILIATION-RULES.md` exactly, in order, with the stated tolerances. Pure function: `(orders, payments) => Discrepancy[]`, no I/O inside it — easy to point at in the review. — 90 min
 - [ ] **Dashboard** — headline tiles (total orders, total payments, total reconciled, total at risk), one chart (discrepancy counts by type), drill-down table with filter/search that opens the exact rows behind a number. — 90 min
