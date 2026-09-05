@@ -52,10 +52,11 @@ export async function runParse(importId: string, userId: string): Promise<ParseS
     const { rows, rowErrors } = parsePaymentsCsv(csvText);
     const { count } = await db.payment.createMany({
       data: rows.map((r) => ({ ...r, userId })),
+      skipDuplicates: true,
     });
     const status = rowErrors.length > 0 ? "PARTIALLY_COMPLETED" : "COMPLETED";
     await db.import.update({ where: { id: importId }, data: { status } });
-    return { importId, status, inserted: count, duplicatesDropped: 0, rowErrors };
+    return { importId, status, inserted: count, duplicatesDropped: rows.length - count, rowErrors };
   } catch (err) {
     await db.import.update({ where: { id: importId }, data: { status: "FAILED" } });
     const message = err instanceof Error ? err.message : "Unknown parsing error";

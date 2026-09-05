@@ -74,7 +74,7 @@ export function Dashboard() {
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {headline && (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           <StatTile label="Total orders" value={String(headline.totalOrders)} />
           <StatTile label="Total payments" value={String(headline.totalPayments)} />
           <StatTile label="Value reconciled" value={formatCurrency(headline.totalValueReconciled)} />

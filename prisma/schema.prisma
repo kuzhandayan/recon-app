@@ -94,6 +94,7 @@ model Payment {
 
   user User @relation(fields: [userId], references: [id])
 
+  @@unique([userId, transactionRef])
   @@index([userId, orderKey])
 }
 

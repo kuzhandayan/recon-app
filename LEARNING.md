@@ -283,6 +283,75 @@ docs/ 200-line rule (see CLAUDE.md) since it's just for you.
   `docker-compose.yml`) — that's a local convenience only, separate from how
   the app actually gets deployed. Nothing there changes.
 
+## Re-uploading payments.csv silently doubled every payment — Payment had no unique constraint
+
+- Symptom: uploaded `orders.csv` + `payments.csv`, ran reconciliation, numbers
+  matched the data-findings doc exactly (verified line by line). Then
+  re-uploaded the same `payments.csv` again to test the flow a second time —
+  `Total payments` jumped from 187 to 374, and 180 of 184 orders suddenly
+  showed as `DUPLICATE_PAYMENT`.
+- Not a reconciliation bug: the engine was reacting correctly to what was
+  actually in the database. Every payment row genuinely existed twice, so
+  every order genuinely had two identical charges — `DUPLICATE_PAYMENT` was
+  the right call for that (corrupted) input.
+- Root cause: `Order` has `@@unique([userId, orderKey])`, and its insert
+  already used `skipDuplicates: true` — so re-uploading `orders.csv` silently
+  no-ops on the second pass (`Total orders` correctly stayed at 184).
+  `Payment` had **no unique constraint at all**, and its insert had no
+  `skipDuplicates`, so a repeat upload just blindly appended 187 more rows.
+- Key distinction that made the fix safe: a *real* double-charge (the
+  `DUPLICATE_PAYMENT` case the engine is supposed to catch, e.g. `ORD-1501`
+  charged twice) always has **two different transaction refs**
+  (`TXN700167`, `TXN700168`) — see data-findings.md: "Transaction refs are
+  distinct, so deduplication has to key on (order reference, amount, close
+  processing time) — not on the transaction ref." A re-uploaded file
+  duplicate has the **same** transaction ref appearing twice. So a
+  uniqueness rule on `transactionRef` blocks only the accidental-reupload
+  case and never touches the real business case, which the engine already
+  keys on amount-within-an-order instead.
+- Fix, in order (schema changes need existing duplicates gone first, or the
+  migration fails on the constraint violation):
+  1. Deleted the duplicated rows directly in Neon (kept the earliest row per
+     `(userId, transactionRef)`, via a `ROW_NUMBER() OVER (PARTITION BY ...)`
+     delete — `npx prisma db execute --file=...`, not `migrate dev`, which
+     needs a TTY and fails non-interactively).
+  2. Added `@@unique([userId, transactionRef])` to `Payment` in
+     `prisma/schema.prisma`, matching the pattern `Order` already had.
+  3. Added `skipDuplicates: true` to the payment insert in
+     `app/api/parse/route.ts`, and changed `duplicatesDropped` from a
+     hardcoded `0` to `rows.length - count` — same as the order insert.
+  4. `prisma migrate dev` also refused to run non-interactively; worked
+     around it with `prisma migrate diff --script` to get the exact SQL,
+     hand-wrote the migration folder to match Prisma's naming convention,
+     then `prisma migrate deploy` to apply it. Applied cleanly with zero
+     conflicts, confirming step 1 fully cleaned the duplicates first.
+- After the fix: a repeat upload of the same payments file gets silently
+  ignored (no doubling), while a genuine double-charge in the source data is
+  still caught and shown as `DUPLICATE_PAYMENT`, unaffected by this change.
+
+## Why Prisma migration commands need `--file` / `--create-only`-style workarounds here
+
+- `npx prisma migrate dev` refuses to run at all in this environment:
+  `Error: Prisma Migrate has detected that the environment is
+  non-interactive, which is not supported.` Both the plain form and
+  `--create-only` hit the same wall — Prisma 7's `migrate dev` unconditionally
+  wants a TTY, even when only creating a migration file (no prompt content
+  needed for a single additive change).
+- Working pattern for a one-off additive migration from this shell:
+  1. `npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script`
+     — prints the exact SQL Prisma would generate, without touching anything.
+  2. Hand-create `prisma/migrations/<timestamp>_<name>/migration.sql` with
+     that SQL, matching the existing folder-naming convention so `migrate
+     deploy`'s history table recognizes it as one more entry in sequence.
+  3. `npx prisma migrate deploy` — this one *does* run non-interactively
+     (it's meant for CI/deploy pipelines), applies the migration, and updates
+     Prisma's `_prisma_migrations` tracking table.
+  4. `npx prisma generate` to regenerate the client against the new schema.
+- Also relevant from earlier: DB migrations sometimes need to run from a
+  network that isn't blocking Postgres's port (see "the real reason the
+  database kept failing" above) — this session's network wasn't blocked, so
+  that wasn't the issue this time, only the TTY requirement was.
+
 ## Why Backblaze B2 for raw file storage (not just parsing and discarding)
 
 - The assignment only requires the *parsed* rows in a database — but keeping
