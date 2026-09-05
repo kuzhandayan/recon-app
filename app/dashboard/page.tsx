@@ -23,6 +23,7 @@ export default async function DashboardPage() {
       kind: imp.kind,
       fileName: imp.fileName,
       status: imp.status,
+      isReconciled: imp.isReconciled,
       createdAt: imp.createdAt.toISOString(),
       downloadUrl: b2Configured() ? await getDownloadUrl(imp.key) : null,
     }))

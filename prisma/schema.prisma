@@ -48,9 +48,10 @@ model Import {
   kind      FileKind
   key       String
   fileName  String       @default("")
-  status    ImportStatus @default(PENDING)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  status       ImportStatus @default(PENDING)
+  isReconciled Boolean      @default(false) // flips true after a reconcile run covers this import; new uploads reset it
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
   user User @relation(fields: [userId], references: [id])
 

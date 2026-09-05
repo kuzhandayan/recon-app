@@ -48,6 +48,9 @@ export async function POST(req: NextRequest) {
         details: r.details as Prisma.InputJsonValue,
       })),
     }),
+    // Every import currently in the DB was included in this run — mark them reconciled.
+    // A later upload creates a fresh Import row with isReconciled defaulting back to false.
+    db.import.updateMany({ where: { userId }, data: { isReconciled: true } }),
   ]);
 
   return NextResponse.json({ totalOrders: orders.length, totalPayments: payments.length, totalDiscrepancies: results.length });

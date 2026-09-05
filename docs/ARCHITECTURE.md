@@ -7,7 +7,7 @@
 - **Auth: custom, not a third-party provider** — email + password, bcrypt hash, our own JWT in an httpOnly cookie. Every API route checks the cookie and scopes queries to `userId`.
 - **Raw file storage: Backblaze B2 (private bucket)** — the uploaded CSVs themselves are stored here, not just their parsed rows. See "File storage" below for exactly how.
 - **Parsing and reconciliation: TypeScript, not Python.** The dataset is ~200 rows total — no performance case for pandas/dataframes here. Keeping it TypeScript means one language, one service, one thing to explain in the review, rather than a second Python service talking to the Node one over the network.
-- **LLM: Groq (Llama 3.3 70B), OpenAI-compatible SDK** — free tier, JSON mode for structured output. Gemini free tier is the manual fallback if Groq rate-limits.
+- **LLM: Groq (`openai/gpt-oss-20b`), OpenAI-compatible SDK** — free tier, JSON mode for structured output. `llama-3.3-70b-versatile` (the original choice) was decommissioned by Groq; swapped for a currently-active model verified against `GET /openai/v1/models`. Gemini (`gemini-flash-lite-latest` — an alias, not a pinned version, so it can't go stale the same way) is an **automatic** fallback — `lib/llm.ts` calls it only when Groq itself errors (rate limit, outage, decommissioned model, etc.), not a manual backup.
 - **Docker: local dev only** (hot reload via volume mount). **Deploy target: Vercel** — Next.js's native platform, zero container config, generous free tier. No production Dockerfile is built; the dev Docker setup stays a local convenience only.
 - **Either `npm run dev` on the host or Docker works for local dev.** The Docker path had `ETIMEDOUT` database failures until the base image moved from Alpine to Debian (see the Docker section below).
 
@@ -58,7 +58,7 @@ lib/
   storage.ts                 <- B2 upload / signed-URL / fetch helpers
   csv.ts                     <- CSV parsing + column validation
   reconcile.ts               <- the deterministic engine (isolated, unit-testable)
-  llm.ts                     <- the one Groq call, structured output + error handling
+  llm.ts                     <- the one LLM call (Groq, Gemini fallback), structured output + error handling
 prisma/
   schema.prisma
 docs/

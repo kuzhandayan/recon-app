@@ -11,11 +11,14 @@ was chosen, or the folder tree, see ARCHITECTURE.md — not repeated here.
 
 ## Common components (components/)
 
-- `UploadForm` — the two-file CSV picker + submit button
+- `UploadForm` — the two-file CSV picker + submit button; each row in the uploaded-files list
+  shows an `isReconciled` badge (flips true after a reconcile run, resets false on a new upload)
 - `StatTile` — one headline number (label, value, optional severity color)
 - `DiscrepancyChart` — one chart, discrepancy counts by type
-- `DiscrepancyTable` — filterable/searchable drill-down table
-- `ExplainPanel` — shows the LLM explanation for a clicked row, with loading/error states
+- `DiscrepancyTable` — filterable/searchable drill-down table, an "Explain" button per row
+- `ExplainPanel` — the LLM explanation as a right-side slide-in drawer (portaled to `document.body`
+  so it always covers the true viewport), loading/error states, word-by-word reveal on a fresh
+  answer, instant on a cached one
 
 ## API routes (app/api/)
 
@@ -23,9 +26,10 @@ was chosen, or the folder tree, see ARCHITECTURE.md — not repeated here.
 - `auth/logout` — clears the session cookie
 - `upload` — receives a file, sends it to B2, stores the returned key
 - `parse` — reads the file back from B2 by key, inserts rows into Postgres
-- `reconcile` — runs `lib/reconcile.ts` over that user's orders + payments
+- `reconcile` — runs `lib/reconcile.ts` over that user's orders + payments, marks all current
+  imports `isReconciled: true`
 - `discrepancies` — returns the classified list for the dashboard
-- `explain` — the one Groq call per discrepancy
+- `explain` — one LLM call per discrepancy (Groq, Gemini fallback), result cached on the row
 
 ## File upload — inside Docker specifically
 

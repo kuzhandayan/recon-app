@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ExplainPanel } from "@/components/ExplainPanel";
 
 interface DiscrepancyRow {
   id: string;
@@ -8,7 +9,10 @@ interface DiscrepancyRow {
   class: string;
   severity: string;
   amountDifference: string | null;
+  explanation: string | null;
 }
+
+const NOT_EXPLAINABLE = new Set(["MATCHED", "WITHIN_TOLERANCE"]);
 
 const CLASS_OPTIONS = [
   "DUPLICATE_PAYMENT",
@@ -42,6 +46,7 @@ export function DiscrepancyTable({ refreshKey = 0 }: DiscrepancyTableProps) {
   const [pageSize, setPageSize] = useState(20);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<DiscrepancyRow | null>(null);
 
   useEffect(() => {
     setPage(1);
@@ -115,18 +120,19 @@ export function DiscrepancyTable({ refreshKey = 0 }: DiscrepancyTableProps) {
               <th className="px-3 py-2">Type</th>
               <th className="px-3 py-2">Severity</th>
               <th className="px-3 py-2">Amount</th>
+              <th className="px-3 py-2">Explain</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={4} className="px-3 py-4 text-center text-gray-500">
+                <td colSpan={5} className="px-3 py-4 text-center text-gray-500">
                   Loading…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-3 py-4 text-center text-gray-500">
+                <td colSpan={5} className="px-3 py-4 text-center text-gray-500">
                   No discrepancies match these filters.
                 </td>
               </tr>
@@ -137,12 +143,42 @@ export function DiscrepancyTable({ refreshKey = 0 }: DiscrepancyTableProps) {
                   <td className="px-3 py-2">{row.class.replaceAll("_", " ")}</td>
                   <td className="px-3 py-2">{row.severity}</td>
                   <td className="px-3 py-2">{row.amountDifference ? `$${row.amountDifference}` : "—"}</td>
+                  <td className="px-3 py-2">
+                    {NOT_EXPLAINABLE.has(row.class) ? (
+                      <span className="text-gray-400">—</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setSelected(row)}
+                        className="rounded border px-2 py-0.5 text-xs font-medium hover:bg-black/5 dark:hover:bg-white/10"
+                      >
+                        {row.explanation ? "View" : "Explain"}
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
       </div>
+
+      {selected && (
+        <ExplainPanel
+          key={selected.id}
+          discrepancyId={selected.id}
+          orderKey={selected.orderKey}
+          discrepancyClass={selected.class}
+          severity={selected.severity}
+          amountDifference={selected.amountDifference}
+          cachedExplanation={selected.explanation}
+          onClose={() => setSelected(null)}
+          onExplained={(explanation) => {
+            setRows((prev) => prev.map((r) => (r.id === selected.id ? { ...r, explanation } : r)));
+            setSelected((prev) => (prev ? { ...prev, explanation } : prev));
+          }}
+        />
+      )}
 
       <div className="flex items-center justify-between text-sm">
         <span className="text-gray-500">

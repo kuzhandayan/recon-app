@@ -8,6 +8,7 @@ interface ImportRow {
   kind: "ORDERS" | "PAYMENTS";
   fileName: string;
   status: string;
+  isReconciled: boolean;
   createdAt: string;
   downloadUrl: string | null;
 }
@@ -197,8 +198,19 @@ export function UploadForm({ initialImports, initialNextCursor }: UploadFormProp
                 const tooltip = `File: ${imp.fileName || "(unknown)"}\nUploaded: ${new Date(imp.createdAt).toLocaleString()}`;
                 return (
                   <li key={imp.id} className="flex items-center justify-between gap-2 rounded border px-3 py-2">
-                    <span>
+                    <span className="flex items-center gap-2">
                       {imp.kind} — {imp.status}
+                      {imp.status === "COMPLETED" && (
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-xs font-medium ${
+                            imp.isReconciled
+                              ? "border-green-500 text-green-500"
+                              : "border-yellow-500 text-yellow-500"
+                          }`}
+                        >
+                          {imp.isReconciled ? "Reconciled" : "Run reconciliation to see this"}
+                        </span>
+                      )}
                     </span>
                     <span className="flex items-center gap-2">
                       {imp.downloadUrl && (

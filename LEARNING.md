@@ -4,6 +4,71 @@ Personal reference, not a deliverable doc — updated as we build, explaining
 *what* we implemented and *why*, in plain terms. Not subject to the
 docs/ 200-line rule (see CLAUDE.md) since it's just for you.
 
+## Requirement checklist — what the brief asked for, what's done
+
+| Requirement | Status | Where |
+|---|---|---|
+| Auth: signup/login, per-user isolation, hashed passwords, protected routes | Done | `lib/auth.ts`, `proxy.ts` |
+| Data ingestion: upload both CSVs into a real database | Done | `app/api/upload`, `app/api/parse` |
+| Reconciliation engine: deterministic, no LLM in the matching | Done, verified against real data | `lib/reconcile.ts` |
+| Dashboard: headline stats, chart, filterable/searchable drill-down | Done, verified against real data | `components/Dashboard.tsx` + children |
+| LLM integration: backend-only, structured output, temperature choice, never decides matching | Done | `lib/llm.ts`, `app/api/explain` |
+| Frontend quality: loading/error states, including during the LLM call | Done | `ExplainPanel.tsx` |
+| Deploy everything, live URL | Not done — local/Docker only so far | — |
+| README: setup, architecture, reconciliation logic, findings, LLM approach, next steps, AI-tool note | Done | `README.md` |
+| `.env.example` | Done | `.env.example` |
+
+## "Why this, not that" — quick answers for the defend-your-decisions round
+
+The brief says the next round walks through specific commits and asks *why*. These are the
+one-line versions; each has a fuller entry below or in `docs/`.
+
+- **Why Next.js for both frontend and backend, not a separate API service?** One language, one
+  deploy target, one thing to explain. API routes under `app/api/` are a real backend (they
+  run server-side, never ship to the browser) — this isn't a shortcut, it's App Router doing
+  what it's designed for.
+- **Why Prisma + Postgres, not a NoSQL store or raw SQL?** The data is inherently relational
+  (users own orders, orders relate to payments, payments produce discrepancies) — a document
+  store would just be simulating joins badly. Prisma over raw SQL: generated types catch a
+  typo'd column name at compile time instead of a runtime query failure, and `schema.prisma`
+  is one file that documents the whole data model, useful to point at in a review call.
+- **Why custom auth, not NextAuth/Clerk/Auth0?** One less dependency, one less third-party
+  outage risk on a live demo, and the requirement (email+password, hash, session) is simple
+  enough that a library adds surface area without adding real safety — `bcryptjs` + a signed
+  JWT in an httpOnly cookie *is* the standard pattern those libraries wrap anyway.
+- **Why TypeScript for the reconciliation engine, not Python/pandas?** ~200 rows total — no
+  performance case for a dataframe library. Same language as the rest of the app means no
+  second service, no network hop between a Python worker and the Node app, one less thing to
+  operate and explain.
+- **Why keep the raw CSV in B2 instead of just the parsed rows (which is all the brief
+  requires)?** Re-processability: if the reconciliation logic changes, it can be re-run
+  against the original upload without asking the user to upload again. Private bucket because
+  the files contain customer emails and amounts.
+- **Why Groq + Gemini fallback instead of just OpenAI?** Both are free-tier and sufficient for
+  a two-sentence explanation task — no reason to spend on a paid API for this. Two providers
+  (not one) because a single point of failure on a live demo is a bad look; Gemini only fires
+  when Groq itself errors, so under normal operation only one provider's quota is ever spent.
+- **Why the smallest model on each provider, not the largest available?** The task is
+  summarizing an already-computed classification in 1-2 sentences each — that doesn't need a
+  large model's reasoning depth, and a smaller model means the free-tier quota lasts through
+  a full demo/review session instead of getting rate-limited mid-walkthrough.
+- **Why temperature 0.2 specifically, not 0 or the default (~0.7-1)?** The brief requires the
+  *matching* to be deterministic, not the LLM's prose — the classification and dollar amount
+  are already fixed by `reconcile.ts` before the LLM ever sees the row, so the LLM changing a
+  word of phrasing between runs costs nothing. 0 buys no real benefit here since there's no
+  correctness at stake in phrasing, only naturalness — a temperature-0 output reads
+  noticeably flatter/more repetitive. The default is too high: JSON-mode outputs get more
+  prone to a stray malformed response as temperature rises, and there's no upside to variety
+  in a factual 2-sentence explanation. 0.2 is the "boring but reliable" middle: close to
+  deterministic, low risk of a broken JSON response, still reads like a sentence a person
+  wrote rather than a template.
+- **Why cache the explanation instead of calling the LLM every time a row is viewed?** Cost
+  and speed — the underlying discrepancy doesn't change between views, so there's nothing new
+  to explain. Cache invalidates specifically when reconciliation re-runs (deletes and
+  recreates all discrepancy rows), which is exactly when a stale explanation could describe
+  numbers that no longer apply — not on a timer, not manually, tied to the one event that
+  actually invalidates it.
+
 ## Cookies vs localStorage (auth)
 
 - **httpOnly cookie** — the server sets it via a `Set-Cookie` response header.
@@ -362,3 +427,124 @@ docs/ 200-line rule (see CLAUDE.md) since it's just for you.
   emails and amounts — anyone with the object URL could read them if it
   were public. The backend fetches using its own B2 credentials or a
   short-lived signed URL, generated fresh each time, never stored.
+
+## Building the LLM integration: both original model names were already dead
+
+- The plan (`docs/ARCHITECTURE.md`) named `llama-3.3-70b-versatile` on Groq and a manual
+  Gemini fallback. Wired up `lib/llm.ts` + `/api/explain/route.ts` + `ExplainPanel.tsx` exactly
+  per the existing docs/schema (the `Discrepancy.explanation` field and `groq-sdk` dependency
+  were already scaffolded), then the first real test call failed: `404 model_not_found`.
+- Checked `GET /openai/v1/models` on the actual key instead of guessing a replacement — Groq
+  had decommissioned that model entirely. The active text-chat models with JSON-mode support
+  turned out to be `openai/gpt-oss-20b` and `openai/gpt-oss-120b`; picked the 20B one, since a
+  two-sentence explanation of an already-classified row doesn't need the larger model's
+  reasoning depth, and the smaller one preserves free-tier quota for a full demo/review.
+- Promoted Gemini from "manual fallback" to **automatic**: `explainDiscrepancy()` tries Groq
+  first, and only calls Gemini if Groq itself throws — so under normal operation only one
+  provider's quota is ever touched.
+- The Gemini side had the *same* staleness problem, twice over, before landing on a fix that
+  actually holds: `gemini-2.0-flash` → 404 (deprecated), `gemini-2.5-flash` → 404 ("no longer
+  available to new users"), `gemini-flash-latest` → 503 (temporarily overloaded, but at least a
+  valid name), `gemini-3.1-flash-lite` → worked, confirmed with the exact request/response
+  shape used by `lib/llm.ts`. But hardcoding "3.1" is exactly the mistake that killed the Groq
+  model in the first place. Found `gemini-flash-lite-latest` — a semantic alias, not a pinned
+  version — and confirmed it transparently resolves to whatever Google's current lite model is
+  (`gemini-3.5-flash-lite` at the time of testing, per the `modelVersion` field in the
+  response) without ever needing the code updated again as versions roll over.
+- Lesson: **never trust a model name from docs, training data, or a plan written days earlier
+  — hit the provider's own `/models` endpoint (or the docs bundled with the SDK) and verify
+  live before wiring it in.** Two providers, two stale names, on the very first real test.
+
+## The explanation drawer wasn't covering the full screen — an ancestor-transform bug
+
+- Symptom: the "Explain" drawer (a `position: fixed` right-side panel) left a visible gap on
+  one edge, showing un-dimmed page content behind the backdrop that was supposed to cover the
+  whole viewport.
+- Cause: `position: fixed` is normally relative to the *viewport* — but if any ancestor element
+  has a CSS `transform`, `filter`, `perspective`, or similar property, that ancestor becomes
+  the containing block for `fixed` descendants instead, and the "fixed" element only covers
+  that ancestor's box, not the true screen. This is a well-known CSS gotcha, not obvious from
+  the component's own code, since `ExplainPanel.tsx` itself never got a transform — some
+  ancestor further up the tree did.
+- Fix: render the backdrop + drawer through a **React Portal** (`createPortal(..., document.body)`)
+  instead of in-place in the component tree. A portal only changes *where in the DOM* the
+  element lives, not the React state/props relationship — so it escapes every ancestor's
+  stacking context entirely and is guaranteed to cover the real viewport regardless of what any
+  parent component does with CSS, now or in the future.
+- Needed a `mounted` guard (`useEffect(() => setMounted(true), [])`) before calling
+  `createPortal`, since `document` doesn't exist during server-side rendering — the portal only
+  renders after the component has actually mounted in the browser.
+
+## Two dark-mode contrast bugs: light Tailwind classes on a page that renders dark
+
+- `app/globals.css` uses `prefers-color-scheme: dark` to flip the whole page to a near-black
+  background with near-white text when the OS/browser is in dark mode — which is how this app
+  was actually being viewed throughout testing.
+- Bug 1: `ExplainPanel` was first built with `bg-gray-50` (a near-white fill) and no explicit
+  text color, so the paragraph text inherited the page's near-white foreground — near-white
+  text on a near-white background, unreadable. Fixed by dropping the fill entirely and using a
+  border-only box like the rest of the dashboard (`StatTile` etc.), which already worked
+  correctly in both themes.
+- Bug 2: the "Explain"/"View" button's `hover:bg-gray-100` had the identical problem on hover —
+  a light hover fill combined with inherited light text. Fixed with a theme-aware overlay
+  instead of a solid light fill: `hover:bg-black/5 dark:hover:bg-white/10` — translucent, so it
+  darkens on a light background and lightens on a dark one, staying legible either way.
+- General lesson for this codebase: **never pair a plain light Tailwind fill class
+  (`bg-gray-50`, `hover:bg-gray-100`, etc.) with inherited/unset text color** — either give the
+  element an explicit text color that matches, or use a translucent black/white overlay
+  (`black/5`, `white/10`) that adapts to whatever surface it sits on instead of a fixed light
+  shade.
+
+## Word-by-word reveal on a fresh explanation, instant on a cached "View"
+
+- Feature request: make a first-time LLM explanation visibly "generate" (word-by-word, like
+  it's being typed), so the UI reads as the AI actually working — but a second view of the same
+  already-cached row should show the text immediately, since nothing is actually being
+  generated the second time.
+- Implementation: a `wasCachedOnOpen` ref, set once from the `cachedExplanation` prop at mount
+  (a `key={selected.id}` on `<ExplainPanel>` forces a clean remount per row, so this never
+  leaks state between different discrepancies). If the panel opened already cached, the full
+  text renders immediately. If it opened fresh, a `setInterval` reveals one more word every
+  ~45ms until the full response is shown, with a blinking cursor while incomplete.
+- This is a pure UI/UX layer — it has no effect on caching, on how many LLM calls are made, or
+  on what's stored in the database. The full explanation is already sitting in memory the
+  moment the fetch resolves; the reveal is purely a rendering choice for how it appears.
+
+## The "explain" request that showed as failed (ECONNRESET) wasn't a bug — React Strict Mode
+
+- Symptom: the very first live test of `/api/explain` showed **two** network requests in
+  DevTools — one canceled (red), one successful (200) — and the server log showed
+  `Error: aborted / code: ECONNRESET` right before the successful request.
+- Cause: Next.js has `reactStrictMode: true` by default (nothing in `next.config.ts` overrides
+  it), and Strict Mode deliberately double-invokes effects in development only — mount, run
+  effects, unmount (running cleanup), mount again — specifically to catch effects that don't
+  clean up properly. `ExplainPanel`'s `useEffect` uses an `AbortController` or matches this
+  pattern; the first mount's cleanup called `controller.abort()`, killing that in-flight
+  request mid-flight — which the server correctly logs as a reset connection — before the
+  second mount's fetch completed normally.
+- Not a bug: it's proof the cleanup function *is* working (an uncleaned effect is what Strict
+  Mode is designed to expose), and it's dev-mode-only noise — `next build && next start` never
+  double-invokes effects, so this never happens in production.
+- Lesson: **a paired canceled+successful request for the same endpoint, immediately after each
+  other, in dev only, is the Strict Mode signature** — check `next.config.ts` for
+  `reactStrictMode` before assuming a real race condition or backend flakiness.
+
+## The `isReconciled` flag: closing the "did I already reconcile this data" gap
+
+- Request: after uploading, a user shouldn't have to guess whether the discrepancy list on
+  screen reflects the data currently on file — the UI should say so directly, per import.
+- Added `isReconciled Boolean @default(false)` to the `Import` model. New uploads start false.
+  `/api/reconcile`'s existing `$transaction` (which already deletes/recreates all of a user's
+  `Discrepancy` rows on every run) got one more statement:
+  `db.import.updateMany({ where: { userId }, data: { isReconciled: true } })` — marking every
+  import current at the time of that run as covered by it, atomically with the rest.
+- The self-correcting part: a *later* upload creates a brand-new `Import` row, which defaults
+  back to `isReconciled: false` via the column default — nothing needs to explicitly "reset" it,
+  the default does that for free. Verified live: uploaded, reconciled (flipped true), uploaded
+  again (new row false, old row stayed true), exactly the intended behavior.
+- `UploadForm.tsx` renders a badge per row — green "Reconciled" or yellow "Run reconciliation to
+  see this" — driven directly by this field, no separate polling or check needed since the
+  existing post-upload `refreshImports()` call already re-fetches it.
+- Migration for this went through the same non-interactive workaround as the earlier
+  `Payment.transactionRef` constraint (see above): `migrate diff --script` → hand-write the
+  migration folder → `migrate deploy`.

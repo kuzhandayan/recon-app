@@ -57,6 +57,7 @@ export async function GET(req: NextRequest) {
       kind: imp.kind,
       fileName: imp.fileName,
       status: imp.status,
+      isReconciled: imp.isReconciled,
       createdAt: imp.createdAt,
       downloadUrl: b2Configured() ? await getDownloadUrl(imp.key) : null,
     }))

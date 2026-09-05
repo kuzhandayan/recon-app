@@ -1,6 +1,4 @@
-// Deterministic reconciliation engine. Classification order, tolerances, and rationale are
-// documented in docs/RECONCILIATION-RULES.md — this file implements that spec exactly.
-// Pure function: no DB, no fetch, no Date.now()/Math.random() inside. Same input -> same output.
+// Deterministic, pure function (no DB/fetch/Date.now/Math.random) — spec in docs/RECONCILIATION-RULES.md
 
 export interface ReconcileOrder {
   orderKey: string;
