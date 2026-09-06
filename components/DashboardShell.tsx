@@ -17,9 +17,16 @@ interface ImportRow {
 interface DashboardShellProps {
   initialImports: ImportRow[];
   initialNextCursor: string | null;
+  sampleOrdersUrl: string | null;
+  samplePaymentsUrl: string | null;
 }
 
-export function DashboardShell({ initialImports, initialNextCursor }: DashboardShellProps) {
+export function DashboardShell({
+  initialImports,
+  initialNextCursor,
+  sampleOrdersUrl,
+  samplePaymentsUrl,
+}: DashboardShellProps) {
   const [importsRefreshKey, setImportsRefreshKey] = useState(0);
   const [uploadListRefreshKey, setUploadListRefreshKey] = useState(0);
 
@@ -30,6 +37,8 @@ export function DashboardShell({ initialImports, initialNextCursor }: DashboardS
         initialNextCursor={initialNextCursor}
         onUploaded={() => setImportsRefreshKey((k) => k + 1)}
         refreshSignal={uploadListRefreshKey}
+        sampleOrdersUrl={sampleOrdersUrl}
+        samplePaymentsUrl={samplePaymentsUrl}
       />
       <Dashboard
         importsRefreshKey={importsRefreshKey}

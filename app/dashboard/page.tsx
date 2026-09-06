@@ -29,13 +29,24 @@ export default async function DashboardPage() {
   );
   const initialNextCursor = initialHasMore ? initialPage[initialPage.length - 1].id : null;
 
+  // Fixed keys for the "Need sample files?" templates shown next to the upload form
+  const SAMPLE_ORDERS_KEY = "uploads/c54284db-3b21-4a14-ba73-99c99cf7a113/orders-1788679093734.csv";
+  const SAMPLE_PAYMENTS_KEY = "uploads/c54284db-3b21-4a14-ba73-99c99cf7a113/payments-1788679099653.csv";
+  const sampleOrdersUrl = b2Configured() ? await getDownloadUrl(SAMPLE_ORDERS_KEY) : null;
+  const samplePaymentsUrl = b2Configured() ? await getDownloadUrl(SAMPLE_PAYMENTS_KEY) : null;
+
   return (
     <main className="flex flex-1 flex-col items-center gap-6 px-4 py-8">
       <div className="flex w-full max-w-lg items-center justify-between">
         <p className="text-sm text-gray-500">Signed in as {user?.email}</p>
         <LogoutButton />
       </div>
-      <DashboardShell initialImports={initialImports} initialNextCursor={initialNextCursor} />
+      <DashboardShell
+        initialImports={initialImports}
+        initialNextCursor={initialNextCursor}
+        sampleOrdersUrl={sampleOrdersUrl}
+        samplePaymentsUrl={samplePaymentsUrl}
+      />
     </main>
   );
 }

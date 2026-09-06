@@ -18,6 +18,8 @@ interface UploadFormProps {
   initialNextCursor: string | null;
   onUploaded?: () => void;
   refreshSignal?: number;
+  sampleOrdersUrl: string | null;
+  samplePaymentsUrl: string | null;
 }
 
 interface FilePickerProps {
@@ -58,7 +60,14 @@ function FilePicker({ kind, label, file, fieldError, disabled, onChange }: FileP
   );
 }
 
-export function UploadForm({ initialImports, initialNextCursor, onUploaded, refreshSignal }: UploadFormProps) {
+export function UploadForm({
+  initialImports,
+  initialNextCursor,
+  onUploaded,
+  refreshSignal,
+  sampleOrdersUrl,
+  samplePaymentsUrl,
+}: UploadFormProps) {
   const [imports, setImports] = useState<ImportRow[]>(initialImports);
   const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -155,22 +164,20 @@ export function UploadForm({ initialImports, initialNextCursor, onUploaded, refr
           expected format.
         </p>
         <div className="mt-2 flex flex-col gap-1">
-          <a
-            href="https://files.catbox.moe/3h985v.csv"
-            className="underline"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Orders template to use
-          </a>
-          <a
-            href="https://files.catbox.moe/htnv22.csv"
-            className="underline"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Payments template to use
-          </a>
+          {sampleOrdersUrl ? (
+            <a href={sampleOrdersUrl} className="underline" target="_blank" rel="noreferrer">
+              Orders template to use
+            </a>
+          ) : (
+            <span className="text-gray-400">Orders template to use</span>
+          )}
+          {samplePaymentsUrl ? (
+            <a href={samplePaymentsUrl} className="underline" target="_blank" rel="noreferrer">
+              Payments template to use
+            </a>
+          ) : (
+            <span className="text-gray-400">Payments template to use</span>
+          )}
         </div>
       </div>
 
