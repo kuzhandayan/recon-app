@@ -146,102 +146,131 @@ export function UploadForm({ initialImports, initialNextCursor, onUploaded, refr
   }
 
   return (
-    <div className="w-full max-w-lg space-y-4">
-      <form onSubmit={handleSubmit} className="space-y-4 rounded border p-4">
-        <FilePicker
-          kind="ORDERS"
-          label="orders.csv"
-          file={ordersFile}
-          fieldError={ordersFieldError}
-          disabled={loading}
-          onChange={(file) => {
-            setOrdersFile(file);
-            setOrdersFieldError(file ? null : ordersFieldError);
-          }}
-        />
-
-        <FilePicker
-          kind="PAYMENTS"
-          label="payments.csv"
-          file={paymentsFile}
-          fieldError={paymentsFieldError}
-          disabled={loading}
-          onChange={(file) => {
-            setPaymentsFile(file);
-            setPaymentsFieldError(file ? null : paymentsFieldError);
-          }}
-        />
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="flex w-full items-center justify-center gap-2 rounded border bg-black py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {loading && (
-            <span
-              aria-hidden
-              className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
-            />
-          )}
-          {loading ? "Uploading…" : "Upload"}
-        </button>
-      </form>
-
-      {error && <Toast message={error} onClose={() => setError(null)} />}
-
-      {imports.length > 0 && (
-        <div className="rounded border">
-          <button
-            type="button"
-            onClick={() => setListOpen(!listOpen)}
-            className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium"
+    <div className="relative w-full max-w-lg">
+      <div className="hidden xl:block absolute left-full top-0 ml-6 w-64 rounded border border-dashed p-3 text-sm">
+        <p className="font-medium">Need sample files?</p>
+        <p className="mt-1 text-gray-500">
+          These templates come with reference data already in them — clear it out and drop in your own
+          rows, but keep the column headings exactly as they are (mandatory), so your CSV matches the
+          expected format.
+        </p>
+        <div className="mt-2 flex flex-col gap-1">
+          <a
+            href="https://files.catbox.moe/3h985v.csv"
+            className="underline"
+            target="_blank"
+            rel="noreferrer"
           >
-            <span>Uploaded files</span>
-            <span aria-hidden>{listOpen ? "▲" : "▼"}</span>
-          </button>
-
-          {listOpen && (
-            <ul className="max-h-96 space-y-2 overflow-y-auto border-t p-3 text-sm">
-              {imports.map((imp) => {
-                const tooltip = `File: ${imp.fileName || "(unknown)"}\nUploaded: ${new Date(imp.createdAt).toLocaleString()}`;
-                return (
-                  <li key={imp.id} className="flex items-center justify-between gap-2 rounded border px-3 py-2">
-                    <span className="flex items-center gap-2">
-                      {imp.kind} — {imp.status}
-                      {imp.status === "COMPLETED" && (
-                        <span
-                          className={`rounded-full border px-2 py-0.5 text-xs font-medium ${
-                            imp.isReconciled
-                              ? "border-green-500 text-green-500"
-                              : "border-yellow-500 text-yellow-500"
-                          }`}
-                        >
-                          {imp.isReconciled ? "Reconciled" : "Run reconciliation to see this"}
-                        </span>
-                      )}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      {imp.downloadUrl && (
-                        <a href={imp.downloadUrl} className="underline" target="_blank" rel="noreferrer">
-                          Download
-                        </a>
-                      )}
-                      <span title={tooltip} className="cursor-help text-gray-500">
-                        ⓘ
-                      </span>
-                    </span>
-                  </li>
-                );
-              })}
-              {nextCursor && (
-                <li ref={sentinelRef} className="py-2 text-center text-gray-500">
-                  {loadingMore ? "Loading more…" : ""}
-                </li>
-              )}
-            </ul>
-          )}
+            Orders template to use
+          </a>
+          <a
+            href="https://files.catbox.moe/htnv22.csv"
+            className="underline"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Payments template to use
+          </a>
         </div>
-      )}
+      </div>
+
+      <div className="w-full space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 rounded border p-4">
+          <FilePicker
+            kind="ORDERS"
+            label="orders.csv"
+            file={ordersFile}
+            fieldError={ordersFieldError}
+            disabled={loading}
+            onChange={(file) => {
+              setOrdersFile(file);
+              setOrdersFieldError(file ? null : ordersFieldError);
+            }}
+          />
+
+          <FilePicker
+            kind="PAYMENTS"
+            label="payments.csv"
+            file={paymentsFile}
+            fieldError={paymentsFieldError}
+            disabled={loading}
+            onChange={(file) => {
+              setPaymentsFile(file);
+              setPaymentsFieldError(file ? null : paymentsFieldError);
+            }}
+          />
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-2 rounded border bg-black py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {loading && (
+              <span
+                aria-hidden
+                className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
+              />
+            )}
+            {loading ? "Uploading…" : "Upload"}
+          </button>
+        </form>
+
+        {error && <Toast message={error} onClose={() => setError(null)} />}
+
+        {imports.length > 0 && (
+          <div className="rounded border">
+            <button
+              type="button"
+              onClick={() => setListOpen(!listOpen)}
+              className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium"
+            >
+              <span>Uploaded files</span>
+              <span aria-hidden>{listOpen ? "▲" : "▼"}</span>
+            </button>
+
+            {listOpen && (
+              <ul className="max-h-96 space-y-2 overflow-y-auto border-t p-3 text-sm">
+                {imports.map((imp) => {
+                  const tooltip = `File: ${imp.fileName || "(unknown)"}\nUploaded: ${new Date(imp.createdAt).toLocaleString()}`;
+                  return (
+                    <li key={imp.id} className="flex items-center justify-between gap-2 rounded border px-3 py-2">
+                      <span className="flex items-center gap-2">
+                        {imp.kind} — {imp.status}
+                        {imp.status === "COMPLETED" && (
+                          <span
+                            className={`rounded-full border px-2 py-0.5 text-xs font-medium ${
+                              imp.isReconciled
+                                ? "border-green-500 text-green-500"
+                                : "border-yellow-500 text-yellow-500"
+                            }`}
+                          >
+                            {imp.isReconciled ? "Reconciled" : "Run reconciliation to see this"}
+                          </span>
+                        )}
+                      </span>
+                      <span className="flex items-center gap-2">
+                        {imp.downloadUrl && (
+                          <a href={imp.downloadUrl} className="underline" target="_blank" rel="noreferrer">
+                            Download
+                          </a>
+                        )}
+                        <span title={tooltip} className="cursor-help text-gray-500">
+                          ⓘ
+                        </span>
+                      </span>
+                    </li>
+                  );
+                })}
+                {nextCursor && (
+                  <li ref={sentinelRef} className="py-2 text-center text-gray-500">
+                    {loadingMore ? "Loading more…" : ""}
+                  </li>
+                )}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
