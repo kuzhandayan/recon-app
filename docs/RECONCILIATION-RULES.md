@@ -14,13 +14,13 @@ Full discrepancy-by-discrepancy detail is kept in a local notes file outside thi
 
 | # | Class | Condition | Severity |
 |---|---|---|---|
-| 1 | `DUPLICATE_PAYMENT` | ≥2 payments with same normalized order key, same amount, both `type = charge` | Critical |
-| 2 | `PAID_BUT_CANCELLED` | order status = `cancelled`, a settled charge exists against it | Critical |
+| 1 | `DUPLICATE_PAYMENT` | ≥2 **settled** payments with same normalized order key, same amount, both `type = charge` | Critical |
+| 2 | `PAID_BUT_CANCELLED` | order status = `cancelled`, a settled charge exists **and settled refunds don't already fully offset it** | Critical |
 | 3 | `MISSING_PAYMENT` | order status = `completed`, no payment row matches the key at all | High |
 | 4 | `FAILED_PAYMENT` | matching payment exists but `status = failed` | High |
 | 5 | `ORPHAN_PAYMENT` | payment key matches no order at all | High |
 | 6 | `CURRENCY_MISMATCH` | order.currency ≠ payment.currency | Medium — never compare amounts across currencies, regardless of numeric equality |
-| 7 | `PARTIAL_REFUND` | order status = `refunded`, refund amount < original charge amount | Medium |
+| 7 | `PARTIAL_REFUND` | settled charge − settled refunds > tolerance | Medium — driven by the charge/refund shortfall itself, not by `order.status` (a shortfall can exist even when status isn't literally `refunded`, e.g. ORD-1702) |
 | 8 | `UNRECORDED_REFUND` | a refund fully offsets a charge, but order status is still `completed` | Medium |
 | 9 | `OVERCHARGED` | payment.amount − order.net_amount > tolerance | High — active refund liability, not just a data mismatch |
 | 10 | `UNDERCHARGED` | order.net_amount − payment.amount > tolerance | Medium |
@@ -34,7 +34,9 @@ Full discrepancy-by-discrepancy detail is kept in a local notes file outside thi
 
 - **Amount tolerance: $0.05 absolute.** Largest observed rounding noise is $0.02; smallest real discrepancy is $18.50. $0.05 sits cleanly between them — no percentage tolerance, because that would scale with order size and hide errors on large orders.
 - **Settlement lag threshold: 72 hours.** Baseline max for clean orders is ~2 hours (median 41 minutes); the one bad case is 696 hours. 72h catches it with wide margin, zero false positives on the clean set.
-- **Duplicate rule: key + amount + type, never time gap.** The two seeded duplicates happen to be 29 minutes apart — do not hardcode that number, it won't generalize.
+- **Duplicate rule: key + amount + type + settled status, never time gap.** The two seeded duplicates happen to be 29 minutes apart — do not hardcode that number, it won't generalize. Restricting to settled charges matters: a failed/pending retry at the same amount as a settled charge is not a duplicate, just a retry.
+- **Cancelled + refund netting.** `PAID_BUT_CANCELLED` must net settled refunds against the settled charge before firing — a cancelled order that was later fully refunded (e.g. ORD-1703) is resolved, not a discrepancy.
+- **Money math runs in integer cents**, not JS floats. All sums/diffs/tolerance comparisons in `reconcile.ts` convert dollars to cents (`Math.round(dollars * 100)`) first and convert back only for output — avoids float-drift risk on repeated refund sums.
 - **Currency: never numeric-compare across currencies.** A EUR 210 charge against a USD 210 order is not a match; it's its own class regardless of the numeric equality.
 
 ## Determinism requirements

@@ -47,11 +47,20 @@ export interface Discrepancy {
   details: Record<string, unknown>;
 }
 
-const AMOUNT_TOLERANCE = 0.05; // dollars — see docs/RECONCILIATION-RULES.md
+const TOLERANCE_CENTS = 5; // $0.05 — see docs/RECONCILIATION-RULES.md
 const SETTLEMENT_LAG_HOURS = 72;
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+// All comparisons/sums below happen in integer cents to avoid float drift — see docs/RECONCILIATION-RULES.md
+function toCents(dollars: number): number {
+  return Math.round(dollars * 100);
+}
+
+function fromCents(cents: number): number {
+  return cents / 100;
 }
 
 function hoursBetween(a: Date, b: Date): number {
@@ -105,21 +114,24 @@ function classifyOrder(order: ReconcileOrder, payments: ReconcilePayment[]): Dis
   const charges = payments.filter((p) => p.type === "charge");
   const refunds = payments.filter((p) => p.type === "refund");
 
-  // 1. DUPLICATE_PAYMENT — two or more charges at the same amount
+  // 1. DUPLICATE_PAYMENT — two or more SETTLED charges at the same amount.
+  // A failed/pending retry at the same amount as a settled charge is not a duplicate.
+  const settledCharges = charges.filter((c) => c.status === "settled");
   const chargeAmountGroups = new Map<number, ReconcilePayment[]>();
-  for (const c of charges) {
-    const list = chargeAmountGroups.get(c.amount) ?? [];
+  for (const c of settledCharges) {
+    const cents = toCents(c.amount);
+    const list = chargeAmountGroups.get(cents) ?? [];
     list.push(c);
-    chargeAmountGroups.set(c.amount, list);
+    chargeAmountGroups.set(cents, list);
   }
-  for (const [amount, group] of chargeAmountGroups) {
+  for (const [cents, group] of chargeAmountGroups) {
     if (group.length >= 2) {
       return {
         orderKey: order.orderKey,
         class: "DUPLICATE_PAYMENT",
         severity: "CRITICAL",
-        amountDifference: round2(amount * (group.length - 1)),
-        details: { transactionRefs: group.map((p) => p.transactionRef), amount },
+        amountDifference: fromCents(cents * (group.length - 1)),
+        details: { transactionRefs: group.map((p) => p.transactionRef), amount: fromCents(cents) },
       };
     }
   }
@@ -135,16 +147,23 @@ function classifyOrder(order: ReconcileOrder, payments: ReconcilePayment[]): Dis
     };
   }
 
-  const settledCharge = charges.find((c) => c.status === "settled");
+  const settledCharge = settledCharges[0];
 
-  // 2. PAID_BUT_CANCELLED
-  if (order.status === "cancelled" && settledCharge) {
+  // Net settled refunds against the settled charge once, up front — used by both
+  // PAID_BUT_CANCELLED (must not fire on a cancelled order that was fully refunded,
+  // e.g. ORD-1703) and the refund-shortfall logic below (e.g. ORD-1702).
+  const settledChargeCents = settledCharge ? toCents(settledCharge.amount) : 0;
+  const refundTotalCents = refunds.reduce((sum, r) => sum + toCents(r.amount), 0);
+  const outstandingCents = settledChargeCents - refundTotalCents;
+
+  // 2. PAID_BUT_CANCELLED — only if the settled charge isn't already fully refunded
+  if (order.status === "cancelled" && settledCharge && outstandingCents > TOLERANCE_CENTS) {
     return {
       orderKey: order.orderKey,
       class: "PAID_BUT_CANCELLED",
       severity: "CRITICAL",
-      amountDifference: round2(settledCharge.amount),
-      details: { transactionRef: settledCharge.transactionRef },
+      amountDifference: fromCents(outstandingCents),
+      details: { transactionRef: settledCharge.transactionRef, refundTotal: fromCents(refundTotalCents) },
     };
   }
 
@@ -171,50 +190,49 @@ function classifyOrder(order: ReconcileOrder, payments: ReconcilePayment[]): Dis
     };
   }
 
-  // 7 & 8: refund handling
+  // 7 & 8: refund shortfall handling — driven purely by charge-minus-refund math, not the
+  // order's status string, so a shortfall like ORD-1702 is caught even when status isn't
+  // literally "refunded". Kept separate from DUPLICATE_PAYMENT above (settled-charges-only).
   if (settledCharge && refunds.length > 0) {
-    const refundTotal = round2(refunds.reduce((sum, r) => sum + r.amount, 0));
-    const outstanding = round2(settledCharge.amount - refundTotal);
-
-    if (order.status === "refunded" && outstanding > AMOUNT_TOLERANCE) {
+    if (outstandingCents > TOLERANCE_CENTS) {
       return {
         orderKey: order.orderKey,
         class: "PARTIAL_REFUND",
         severity: "MEDIUM",
-        amountDifference: outstanding,
-        details: { chargeAmount: settledCharge.amount, refundTotal },
+        amountDifference: fromCents(outstandingCents),
+        details: { chargeAmount: settledCharge.amount, refundTotal: fromCents(refundTotalCents) },
       };
     }
 
-    if (order.status === "completed" && Math.abs(outstanding) <= AMOUNT_TOLERANCE) {
+    if (order.status === "completed" && Math.abs(outstandingCents) <= TOLERANCE_CENTS) {
       return {
         orderKey: order.orderKey,
         class: "UNRECORDED_REFUND",
         severity: "MEDIUM",
-        amountDifference: refundTotal,
-        details: { chargeAmount: settledCharge.amount, refundTotal },
+        amountDifference: fromCents(refundTotalCents),
+        details: { chargeAmount: settledCharge.amount, refundTotal: fromCents(refundTotalCents) },
       };
     }
   }
 
   // 9 & 10: amount mismatch against a settled charge
   if (settledCharge) {
-    const diff = round2(settledCharge.amount - order.netAmount);
-    if (diff > AMOUNT_TOLERANCE) {
+    const diffCents = settledChargeCents - toCents(order.netAmount);
+    if (diffCents > TOLERANCE_CENTS) {
       return {
         orderKey: order.orderKey,
         class: "OVERCHARGED",
         severity: "HIGH",
-        amountDifference: diff,
+        amountDifference: fromCents(diffCents),
         details: { chargeAmount: settledCharge.amount, netAmount: order.netAmount },
       };
     }
-    if (-diff > AMOUNT_TOLERANCE) {
+    if (-diffCents > TOLERANCE_CENTS) {
       return {
         orderKey: order.orderKey,
         class: "UNDERCHARGED",
         severity: "MEDIUM",
-        amountDifference: round2(-diff),
+        amountDifference: fromCents(-diffCents),
         details: { chargeAmount: settledCharge.amount, netAmount: order.netAmount },
       };
     }
@@ -255,9 +273,9 @@ function classifyOrder(order: ReconcileOrder, payments: ReconcilePayment[]): Dis
 
   // 14. WITHIN_TOLERANCE — a real but negligible amount difference; never counted as a discrepancy
   if (settledCharge) {
-    const diff = Math.abs(round2(settledCharge.amount - order.netAmount));
-    if (diff > 0 && diff <= AMOUNT_TOLERANCE) {
-      return { orderKey: order.orderKey, class: "WITHIN_TOLERANCE", severity: "NONE", amountDifference: diff, details: {} };
+    const diffCents = Math.abs(settledChargeCents - toCents(order.netAmount));
+    if (diffCents > 0 && diffCents <= TOLERANCE_CENTS) {
+      return { orderKey: order.orderKey, class: "WITHIN_TOLERANCE", severity: "NONE", amountDifference: fromCents(diffCents), details: {} };
     }
   }
 
